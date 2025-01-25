@@ -6,6 +6,7 @@ import asyncio
 
 from aiogram import Dispatcher, Router
 from aiogram.filters import CommandStart
+from dotenv import load_dotenv
 from fastapi import APIRouter, Request
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, Update, CallbackQuery, InlineKeyboardButton, URLInputFile
@@ -13,6 +14,7 @@ from icecream import ic
 
 from forms.forms import CheckImei
 from models.db_utilit import is_active, is_admin
+from models.model import User
 from utilities.actions import callback_handler, actions
 from utilities.check_imei import send_to_url
 from utilities.icream import log
@@ -23,7 +25,7 @@ from utilities.keyboard_build import KeyboardBuilder
 from utilities.sender import send_message
 
 router = Router()
-
+load_dotenv()
 
 async def delleting_msg(meseges: Optional[Message|CallbackQuery]):
     msg = meseges if isinstance(meseges, Message) else meseges.message
@@ -37,9 +39,13 @@ async def delleting_msg(meseges: Optional[Message|CallbackQuery]):
 
 @router.message(CommandStart())
 async def start_handler(message: Message, state: FSMContext):
+    from utilities.bot_conf import bot
     await delleting_msg(message)
     if not await is_active(message):
-        await send_message(message, "*Ваш аккаунт не активен.*\n\n Запрос на доступ отправлен администратору", image_path='no_auth', edit=True, state=state)
+        admins = await User.filter(is_admin=True).all()
+        for admin in admins:
+            await bot.send_message(admin.tg_id, f'Запрос на активацию аккаунта {message.chat.id}')
+        await send_message(message, f"*Ваш аккаунт не активен.*\n\n Запрос на доступ отправлен администратору\n\nСсылка на API {os.getenv('WEBHOOK_URL')}", image_path='no_auth', edit=True, state=state)
         return
     keyboard = KeyboardBuilder(items_per_page=1)
     items = [
@@ -61,7 +67,7 @@ async def start_handler(message: Message, state: FSMContext):
     if await is_admin(message):
         kb = InlineKeyboardButton(text='Активация пользователя', callback_data='add_user')
         kb_start.inline_keyboard.append([kb])
-    await send_message(message, "*Привет!*\n👋 Я бот для проверки данных IMEI. 🔍.\nДля продолжения нажми кнопку ниже 👇\n⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓",
+    await send_message(message, f"*Привет!*\n👋 Я бот для проверки данных IMEI. 🔍.\n\nСсылка на API {os.getenv('WEBHOOK_URL')}\nДля продолжения нажми кнопку ниже 👇\n⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓⇓",
                        image_path='imei', edit=True, state=state, keyboars=kb_start)
 
 
